@@ -8,6 +8,9 @@ const canvas = document.querySelector('#webgl');
  */
 const scene = new THREE.Scene();
 
+// ✅ CIEL BLEU
+scene.background = new THREE.Color('#87CEEB');
+
 const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
 camera.position.z = 5;
 
@@ -15,18 +18,22 @@ camera.position.z = 5;
  * Initialisation du renderer
  */
 
-const renderer = new THREE.WebGLRenderer({ canvas: canvas });
+const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.outputColorSpace = THREE.SRGBColorSpace; // <-- Ligne à ajouter
-/////////////////////////////////////////// 
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-// Lumière globale
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+// ✅ OMBRES activées
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+// ✅ LUMIÈRES : intensités augmentées
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); // était 0.5
 scene.add(ambientLight);
 
 // Soleil
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-directionalLight.position.set(5, 5, 5);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 3); // était 1
+directionalLight.position.set(5, 10, 5);
+directionalLight.castShadow = true;
 scene.add(directionalLight);
 
 const loader = new GLTFLoader();
@@ -39,7 +46,7 @@ const waterMaterial = new THREE.ShaderMaterial({
     uniforms: {
         u_time: { value: 0.0 },
         // Un bleu-gris nettement plus clair
-        u_waterColor: { value: new THREE.Color('#4A627A') }, 
+        u_waterColor: { value: new THREE.Color('#8ab2dd') }, 
         // Un rose très pâle, proche du blanc pour l'écume
         u_foamColor: { value: new THREE.Color('#F9E5E5') }  
     },
@@ -105,8 +112,8 @@ loader.load(
 
             // On ajoute la lumière en tant qu'enfant du lampadaire
             lampadaire.add(lampLight);
-			const lightHelper = new THREE.PointLightHelper(lampLight, 2);
-			scene.add(lightHelper);
+			// const lightHelper = new THREE.PointLightHelper(lampLight, 2);
+			// scene.add(lightHelper);
         } else {
             console.warn("Le lampadaire n'a pas été trouvé dans le modèle.");
         }
@@ -163,7 +170,8 @@ window.addEventListener('keyup', (event) => {
 // --- PARAMÈTRES DE LA CAMÉRA (Style Animal Crossing) ---
 // L'offset représente la distance de la caméra par rapport au joueur.
 // X = 0 (centré), Y = 8 (en hauteur), Z = 10 (reculé)
-const cameraOffset = new THREE.Vector3(0, 4, 5);
+// ✅ CAMÉRA plus proche du sol (Y: 2 au lieu de 4, Z: 3 au lieu de 5)
+const cameraOffset = new THREE.Vector3(0, 2, 3);
 
 /////////////////////////////////////////// 
 // Variables pour le mouvement
