@@ -14,10 +14,10 @@ camera.position.z = 5;
 /**
  * Initialisation du renderer
  */
+
 const renderer = new THREE.WebGLRenderer({ canvas: canvas });
 renderer.setSize(window.innerWidth, window.innerHeight);
-
-
+renderer.outputColorSpace = THREE.SRGBColorSpace; // <-- Ligne à ajouter
 /////////////////////////////////////////// 
 
 // Lumière globale
@@ -87,7 +87,7 @@ const waterMaterial = new THREE.ShaderMaterial({
 });
 
 loader.load(
-    '/models/world2.glb',
+    '/models/world_haaa.glb',
     (gltf) => {
         gltf.scene.scale.set(0.1, 0.1, 0.1);
         scene.add(gltf.scene);
