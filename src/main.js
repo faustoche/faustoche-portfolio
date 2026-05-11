@@ -87,7 +87,7 @@ const waterMaterial = new THREE.ShaderMaterial({
 });
 
 loader.load(
-    '/models/world.glb',
+    '/models/world2.glb',
     (gltf) => {
         gltf.scene.scale.set(0.1, 0.1, 0.1);
         scene.add(gltf.scene);
