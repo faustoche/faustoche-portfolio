@@ -7,6 +7,7 @@ export default class Player {
         
         // Taille et mouvement du perso, à voir selon les navigateurs 
         this.moveSpeed = 0.05;
+        this.movementOffset = 0;
 
         // Touches
         this.keys = { 
@@ -124,12 +125,16 @@ export default class Player {
             const normalizedDx = dx / length;
             const normalizedDz = dz / length;
 
-            // 3. Application du mouvement
-            this.mesh.position.x += normalizedDx * this.moveSpeed;
-            this.mesh.position.z += normalizedDz * this.moveSpeed;
+            // NOUVEAU : Application de l'angle de la caméra sur les contrôles
+            const finalDx = normalizedDx * Math.cos(this.movementOffset) - normalizedDz * Math.sin(this.movementOffset);
+            const finalDz = normalizedDx * Math.sin(this.movementOffset) + normalizedDz * Math.cos(this.movementOffset);
 
-            // 4. Application de la rotation
-            const angle = Math.atan2(normalizedDx, normalizedDz);
+            // 3. Application du mouvement corrigé
+            this.mesh.position.x += finalDx * this.moveSpeed;
+            this.mesh.position.z += finalDz * this.moveSpeed;
+
+            // 4. Application de la rotation pour que le perso regarde où il va
+            const angle = Math.atan2(finalDx, finalDz);
             this.mesh.rotation.y = angle;
         }
 
