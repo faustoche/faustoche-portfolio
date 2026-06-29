@@ -6,8 +6,8 @@ import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.j
 
 // Attention : Vérifiez bien ces chemins selon l'endroit où se trouve Map.jsx
 // S'il est dans src/pages/, il faut "remonter" d'un dossier avec ../
-import Water from '../World/Water.js';
-import Player from '../Player/Player.js';
+import Water from './World/Water.js';
+import Player from './Player/Player.js';
 
 export default function Map() {
   const canvasRef = useRef(null);
