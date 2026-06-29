@@ -1,18 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>faustoche-portfolio</title>
   </head>
   <body>
-    <div id="fade-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: black; opacity: 0; pointer-events: none; transition: opacity 1s ease-in-out; z-index: 20;"></div>
+    <div id="root"></div>
     
-    <div id="ui-prompt" style="display: none; position: absolute; top: 75%; left: 50%; transform: translate(-50%, -50%); color: white; background: rgba(0,0,0,0.7); padding: 15px 30px; border-radius: 8px; font-family: sans-serif; pointer-events: none; z-index: 10;">
-      Appuyez sur 'E' pour entrer
-    </div>
-
-    <canvas id="webgl"></canvas> <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

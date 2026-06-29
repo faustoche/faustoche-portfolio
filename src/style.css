@@ -1,0 +1,22 @@
+/* src/style.css */
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden; /* Supprime les barres de défilement */
+  background-color: #1a1a1a; /* Fond sombre par défaut */
+  font-family: sans-serif;
+}
+
+/* S'assure que les bordures et espacements ne créent pas de débordement */
+* {
+  box-sizing: border-box;
+}
+
+/* Comportement par défaut du canvas pour éviter les marges invisibles */
+canvas {
+  display: block;
+  outline: none;
+}

@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export default class Player {
-    constructor(scene, modelPath) {
+    constructor(scene, modelPath, renderer) {
         this.scene = scene;
+        this.renderer = renderer;
         
         // Taille et mouvement du perso, à voir selon les navigateurs 
         this.moveSpeed = 0.05;
@@ -38,6 +39,7 @@ export default class Player {
 
     loadModel(path) {
         const loader = new GLTFLoader();
+        const maxAnisotropy = this.renderer.capabilities.getMaxAnisotropy();
         
         loader.load(path, (gltf) => {
             const model = gltf.scene;
@@ -49,6 +51,12 @@ export default class Player {
                 if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+
+                    // --- CORRECTION DU FLOU ---
+                    // Si l'objet possède une image (map), on applique le filtre de netteté
+                    if (child.material && child.material.map) {
+                        child.material.map.anisotropy = maxAnisotropy;
+                    }
                 }
             });
             
