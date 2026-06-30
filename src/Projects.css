@@ -26,7 +26,7 @@ html, body {
 .project-hero {
 	display: flex;
 	justify-content: center;
-	padding: 120px 0 30px;
+	padding: 10px 0 30px;
 }
 .project-hero_title {
 	font-family: 'hello-chunky', cursive;

@@ -99,7 +99,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-	border-radius: 60px;
+  border-radius: 60px;
+  border: solid 1px;
 }
 
 .home-button span {

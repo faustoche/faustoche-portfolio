@@ -25,7 +25,7 @@ export default function Projects() {
             <div className="project-card">
               <div className="card-preview">
                 <img
-                  src="transcendance1.png"
+                  src="transcendance.png"
                   alt="ft_transcendance"
                   className="card-preview_img"
                 />
@@ -73,7 +73,7 @@ export default function Projects() {
                 />
               </div>
               <div className="card-info">
-                <h3>fsdfsdf</h3>
+                <h3>Webserv</h3>
                 <p>dfsdfsdf</p>
                 <button className="open-btn">OPEN <ArrowRight size={14} /></button>
               </div>
@@ -88,7 +88,7 @@ export default function Projects() {
                 />
               </div>
               <div className="card-info">
-                <h3>sdfsdfsdf</h3>
+                <h3>Inception</h3>
                 <p>sdfsdfsdfsdf</p>
                 <button className="open-btn">OPEN <ArrowRight size={14} /></button>
               </div>
