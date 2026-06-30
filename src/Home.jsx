@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Globe, FolderOpen, MoveRight } from 'lucide-react'
-import './style.css';
+import './Home.css';
 
 export default function Home() {
   return (

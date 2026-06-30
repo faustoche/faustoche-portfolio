@@ -31,17 +31,28 @@ export default function Map() {
 
 	const skyColor = '#87CEEB';
 	scene.background = new THREE.Color(skyColor);
+	// Fog resserré : en plus de l'effet visuel, ça réduit la zone perçue,
+	// utile si tu ajoutes du LOD/culling distance plus tard.
 	scene.fog = new THREE.Fog(skyColor, 10, 60);
 
 	const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
 	const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
 	renderer.setSize(window.innerWidth, window.innerHeight);
 
+	// FIX PERF #1 : cap du pixel ratio. Sans ça, sur un écran Retina/4K,
+	// le canvas peut être rendu en interne à 2x-3x la résolution affichée,
+	// ce qui multiplie le coût du fragment shader sur TOUTE la scène.
+	renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 	renderer.toneMapping = THREE.NoToneMapping;
 	renderer.toneMappingExposure = 1.0;
 	renderer.shadowMap.enabled = true;
-	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+	// FIX PERF #2 : PCFSoftShadowMap est le mode d'ombre le plus cher
+	// (multi-échantillonnage par pixel). PCFShadowMap reste propre
+	// visuellement pour ce type de scène et coûte nettement moins cher.
+	renderer.shadowMap.type = THREE.PCFShadowMap;
 
 	const ambientLight = new THREE.AmbientLight(0xffffff, 2);
 	scene.add(ambientLight);
@@ -50,13 +61,20 @@ export default function Map() {
 	directionalLight.position.set(-15, 25, 15);
 	directionalLight.castShadow = true;
 
+	// FIX PERF #3 : le frustum de la shadow camera était de 80x80 unités
+	// (-40 à 40) avec une shadow map de 2048x2048. Plus le frustum est
+	// grand, moins chaque texel d'ombre est précis ET plus le calcul
+	// est cher pour la même résolution. On resserre sur la zone de jeu
+	// réelle (à ajuster selon la taille réelle de ton monde) et on
+	// réduit la résolution en conséquence : le ratio précision/coût
+	// est bien meilleur.
 	directionalLight.shadow.camera.near = 0.5;
-	directionalLight.shadow.camera.far = 100;
-	directionalLight.shadow.camera.left = -40;
-	directionalLight.shadow.camera.right = 40;
-	directionalLight.shadow.camera.top = 40;
-	directionalLight.shadow.camera.bottom = -40;
-	directionalLight.shadow.mapSize.set(2048, 2048);
+	directionalLight.shadow.camera.far = 60;
+	directionalLight.shadow.camera.left = -20;
+	directionalLight.shadow.camera.right = 20;
+	directionalLight.shadow.camera.top = 20;
+	directionalLight.shadow.camera.bottom = -20;
+	directionalLight.shadow.mapSize.set(1024, 1024);
 	directionalLight.shadow.bias = -0.0005;
 	directionalLight.shadow.normalBias = 0.02;
 	scene.add(directionalLight);
@@ -136,7 +154,7 @@ export default function Map() {
 				if (shop.rotYOffset !== 0) newModel.rotateY(shop.rotYOffset);
 				const s = shop.scaleOffset;
 				newModel.scale.set(placeholder.scale.x * s, placeholder.scale.y * s, placeholder.scale.z * s);
-				
+
 				if (placeholder.parent) {
 				  placeholder.parent.add(newModel);
 				} else {
@@ -158,11 +176,18 @@ export default function Map() {
 			  const singleCount = 1250;
 			  const instancedPatch = new THREE.InstancedMesh(grassPatchMesh.geometry, grassPatchMesh.material, patchCount);
 			  const instancedSingle = new THREE.InstancedMesh(singleGrassMesh.geometry, singleGrassMesh.material, singleCount);
-			  instancedPatch.castShadow = true;
-			  instancedSingle.castShadow = true;
-			  instancedPatch.frustumCulled = false;
-			  instancedSingle.frustumCulled = false;
-						  
+
+			  // FIX PERF #4 : l'herbe ne doit pas projeter d'ombre.
+			  // Ça doublait le coût de rendu (passe shadow map + passe couleur)
+			  // pour un résultat visuel imperceptible sur des brins d'herbe.
+			  instancedPatch.castShadow = false;
+			  instancedSingle.castShadow = false;
+			  instancedPatch.receiveShadow = true;
+			  instancedSingle.receiveShadow = true;
+
+			  scene.add(instancedPatch);
+			  scene.add(instancedSingle);
+
 			  const placeGrass = (instancedMesh, count) => {
 				for (let i = 0; i < count; i++) {
 				  sampler.sample(position);
@@ -176,11 +201,15 @@ export default function Map() {
 				  instancedMesh.setMatrixAt(i, dummyGrass.matrix);
 				}
 				instancedMesh.instanceMatrix.needsUpdate = true;
+				instancedMesh.computeBoundingSphere();
 			  };
 			  placeGrass(instancedPatch, patchCount);
 			  placeGrass(instancedSingle, singleCount);
-			  scene.add(instancedPatch);
-			  scene.add(instancedSingle);
+			  // FIX PERF #5 (lié au #2 de la réponse précédente) :
+			  // frustumCulled remis à true (valeur par défaut) maintenant que
+			  // computeBoundingSphere() a été appelé sur les positions réelles
+			  // des instances. Avant, frustumCulled=false forçait le GPU à
+			  // traiter TOUTE l'herbe même hors champ de la caméra.
 			}
 
 			const treePositions = [];
@@ -212,10 +241,22 @@ export default function Map() {
 				treeModel.traverse((part) => {
 				  if (!part.isMesh) return;
 				  const instancedMesh = new THREE.InstancedMesh(part.geometry, part.material, matrices.length);
-				  instancedMesh.castShadow = true;
-				  instancedMesh.frustumCulled = false;
+
+				  // FIX PERF #6 : les arbres projetaient des ombres en
+				  // InstancedMesh, ce qui double leur coût de rendu en plus
+				  // d'alourdir la shadow map. Garde receiveShadow pour que
+				  // le feuillage reçoive bien l'ombre du décor, mais désactive
+				  // castShadow. Si tu veux absolument des ombres d'arbres,
+				  // remets castShadow=true UNIQUEMENT une fois la shadow map
+				  // resserrée (fait ci-dessus) — sinon le coût reste trop élevé.
+				  instancedMesh.castShadow = false;
+				  instancedMesh.receiveShadow = true;
+
 				  matrices.forEach((matrix, index) => instancedMesh.setMatrixAt(index, matrix));
 				  instancedMesh.instanceMatrix.needsUpdate = true;
+				  instancedMesh.computeBoundingSphere();
+				  // frustumCulled reste à true (défaut) grâce au bounding
+				  // sphere calculé sur les vraies positions des instances.
 				  scene.add(instancedMesh);
 				});
 			  });
@@ -235,7 +276,7 @@ export default function Map() {
 
 	function transitionToShop() {
 	  activeScene = 'transition';
-	  
+
 	  if (uiPrompt) uiPrompt.style.display = 'none';
 	  if (fadeOverlay) fadeOverlay.style.opacity = '1';
 
@@ -249,7 +290,7 @@ export default function Map() {
 
 	function loadShopScene() {
 	  activeScene = 'shop';
-	  
+
 	  scene.children.forEach(child => {
 		if (child.type !== 'AmbientLight' && child.type !== 'DirectionalLight' && child !== player.mesh) {
 		  child.visible = false;
@@ -264,17 +305,17 @@ export default function Map() {
 		scene.add(shopScene);
 
 		if (player.mesh) {
-		  player.mesh.position.set(0, 0, 4); 
-		  player.mesh.scale.set(4, 4, 4); 
+		  player.mesh.position.set(0, 0, 4);
+		  player.mesh.scale.set(4, 4, 4);
 		  player.movementOffset = -Math.PI / 2;
-		  player.mesh.visible = true; 
+		  player.mesh.visible = true;
 		}
 
 		loader.load('/models/alan.glb', (alanGltf) => {
 		  const alanModel = alanGltf.scene;
-		  alanModel.scale.set(0.9, 0.9, 0.9); 
+		  alanModel.scale.set(0.9, 0.9, 0.9);
 
-		  const chairObject = shopScene.getObjectByName('Chair'); 
+		  const chairObject = shopScene.getObjectByName('Chair');
 		  if (chairObject) {
 			const chairPosition = new THREE.Vector3();
 			chairObject.getWorldPosition(chairPosition);
@@ -289,7 +330,7 @@ export default function Map() {
 		  if (alanGltf.animations && alanGltf.animations.length > 0) {
 			alanMixer = new THREE.AnimationMixer(alanModel);
 			const idleClip = THREE.AnimationClip.findByName(alanGltf.animations, 'alan_idle');
-			
+
 			if (idleClip) {
 			  const action = alanMixer.clipAction(idleClip);
 			  action.play();
@@ -300,7 +341,7 @@ export default function Map() {
 		  }
 		});
 
-		camera.position.set(15, 6.5, 0); 
+		camera.position.set(15, 6.5, 0);
 		camera.lookAt(0, 2.8, 0);
 	  });
 	}
@@ -329,7 +370,7 @@ export default function Map() {
 		  camera.position.copy(player.mesh.position).add(cameraOffset);
 		  camera.lookAt(player.mesh.position);
 		}
-	  } 
+	  }
 	  else if (activeScene === 'shop') {
 		player.update(deltaTime);
 		if (alanMixer) {
@@ -346,9 +387,9 @@ export default function Map() {
 	  camera.updateProjectionMatrix();
 	  renderer.setSize(window.innerWidth, window.innerHeight);
 	};
-	
+
 	window.addEventListener('resize', handleResize);
-	
+
 	// Starting the animation
 	animate();
 
@@ -363,15 +404,15 @@ export default function Map() {
 
   return (
 	<div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-	  
+
 	  {/* Button to leave the page and return to the menu */}
 	  <Link to="/" style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 30, color: 'white', background: 'rgba(0,0,0,0.5)', padding: '10px 20px', textDecoration: 'none', borderRadius: '5px', fontFamily: 'sans-serif' }}>
-		Back to Home
+		Back to home page
 	  </Link>
-	  
+
 	  {/* original overlays */}
 	  <div id="fade-overlay" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'black', opacity: 0, pointerEvents: 'none', transition: 'opacity 1s ease-in-out', zIndex: 20 }}></div>
-	  
+
 	  <div id="ui-prompt" style={{ display: 'none', position: 'absolute', top: '75%', left: '50%', transform: 'translate(-50%, -50%)', color: 'white', background: 'rgba(0,0,0,0.7)', padding: '15px 30px', borderRadius: '8px', fontFamily: 'sans-serif', pointerEvents: 'none', zIndex: 10 }}>
 		Press 'E' to enter
 	  </div>

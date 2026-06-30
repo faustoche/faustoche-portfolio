@@ -1,0 +1,158 @@
+/* FONT */
+
+@font-face {
+	font-family: "hello-chunky";
+	src: url("/hello-chunky.otf");
+}
+
+/* LAYOUT */
+
+html, body {
+	margin: 0;
+	padding: 0;
+}
+
+.projects {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background-color: #f8f5ee;
+	color: #2b2b2b;
+	font-family: sans-serif;
+}
+
+/* HERO HEADER */
+
+.project-hero {
+	display: flex;
+	justify-content: center;
+	padding: 120px 0 30px;
+}
+.project-hero_title {
+	font-family: 'hello-chunky', cursive;
+	color: #f07400;
+	font-size: 5.5rem;
+	margin: 0;
+}
+/* CADRE PROJETS */
+.project-frame {
+    display: flex;
+    flex-direction: column;
+    gap: 50px;
+    margin: 0 auto 100px;
+    padding: 40px;
+    width: 85%;
+    max-width: 1100px;
+    border: 2px solid #2b2b2b;
+    border-radius: 28px;
+    background-color: #fff;
+}
+
+/* SECTION (Web / Devops) */
+.project-section_header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.project-section_label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    font-size: 0.95rem;
+}
+
+/* COLONNES */
+.project-columns {
+    display: flex;
+    gap: 25px;
+}
+
+.project-card {
+    flex: 1;
+    border: 2px solid #2b2b2b;
+    border-radius: 18px;
+    overflow: hidden;
+    background-color: #fff;
+    display: flex;
+    flex-direction: column;
+}
+
+
+.preview-cream {
+    background-color: #fdeede;
+}
+
+.preview-dark {
+    background-color: #1c1c1c;
+}
+
+.card-preview_text {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.3;
+}
+
+.preview-cream .card-preview_text { color: #2b2b2b; }
+.preview-dark .card-preview_text { color: #fff; }
+
+.card-info {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.card-info h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.card-info p {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.card-preview {
+  width: 100%;
+  height: 200px; /* ou la hauteur que tu avais avant */
+  overflow: hidden;
+  border-radius: 12px; /* garde ce que tu avais déjà */
+}
+
+.card-preview_img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* remplit la carte en gardant les proportions, recadre si besoin */
+  display: block;
+}
+
+.open-btn {
+    align-self: flex-start;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #ffd30d;
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+.open-btn:hover {
+    transform: scale(1.05);
+}
+
+@media (max-width: 700px) {
+    .project-columns {
+        flex-direction: column;
+    }
+}
