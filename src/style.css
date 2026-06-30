@@ -1,22 +1,129 @@
-/* src/style.css */
+/* FONT */
 
-html, body, #root {
-  margin: 0;
-  padding: 0;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden; /* Supprime les barres de défilement */
-  background-color: #1a1a1a; /* Fond sombre par défaut */
-  font-family: sans-serif;
+@font-face {
+	font-family: "hello-chunky";
+	src: url("/hello-chunky.otf");
 }
 
-/* S'assure que les bordures et espacements ne créent pas de débordement */
-* {
-  box-sizing: border-box;
+/* LAYOUT */
+
+html, body {
+	margin: 0;
+	padding: 0;
 }
 
-/* Comportement par défaut du canvas pour éviter les marges invisibles */
-canvas {
-  display: block;
-  outline: none;
+.home {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background-color: #f8f5ee;
+	color: #2b2b2b;
+	font-family: sans-serif;
+}
+
+/* HEADER */
+
+.home-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 24px 48px;
+	position: relative;
+}
+
+.home-header::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	transform: translateX(-50%);
+	bottom: -1px;
+
+	width: 90%;
+	height: 2px;
+	background: #62605d;
+	border-radius: 999px;
+}
+
+.home-header_name {
+	font-size: 1.2rem;
+	font-weight: 600;
+}
+
+.home-header_links {
+	display: flex;
+	gap: 32px;
+}
+
+.home-header_links a {
+	color: #2b2b2b;
+	text-decoration: none;
+	font-size: 0.95rem;
+}
+
+.home-header_links a:hover {
+	text-decoration: underline;
+}
+
+/* HERO HEADER */
+
+.home-hero {
+	display: flex;
+	justify-content: center;
+	padding: 120px 0 30px;
+}
+.home-hero_title {
+	font-family: 'hello-chunky', cursive;
+	color: #f56c91;
+	font-size: 10.5rem;
+	margin: 0;
+}
+
+/* BUTTONS */
+
+.home-buttons {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 40px;
+}
+.home-button {
+  width: 340px;
+  padding: 16px 24px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+	border-radius: 60px;
+}
+
+.home-button span {
+  flex: 1;
+  text-align: center;
+}
+.home-button:hover {
+	opacity: 0.85;
+}
+.home-button--primary {
+	background-color: #f4ca43;
+	color: #513b11;
+}
+.home-button--secondary {
+	background-color: #baa7e1;
+	color: #513b11;
+}
+
+/* FOOTER */
+
+.home-footer {
+	text-align: center;
+	padding: 20px;
+	font-size: 0.8rem;
+	color: #6b6b6b;
+	border-top: 1px solid #e0dccf;
 }
