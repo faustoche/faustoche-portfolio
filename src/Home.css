@@ -16,7 +16,7 @@ html, body {
 	min-height: 100vh;
 	display: flex;
 	flex-direction: column;
-	background-color: #f8f5ee;
+	background-color: #f9f5ea;
 	color: #2b2b2b;
 	font-family: sans-serif;
 }
@@ -115,7 +115,7 @@ html, body {
 	color: #1a1919;
 }
 .home-button--secondary {
-	background-color: #baa7e1;
+	background-color: #FF8C00;
 	color: #1a1919;
 }
 

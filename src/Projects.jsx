@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowRight, X, Code2, NotepadText, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, X, Code2, NotepadText, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 import "./Projects.css";
-
-/// Prendre les images depuis le nom du dossier directement
 
 const webProjects = [
   {
@@ -54,34 +52,58 @@ const devopsProjects = [
     title: "Webserv",
     category: "DEVOPS",
     description: "HTTP server.",
-    longDescription: "Webserv is a  custom HTTP server implemented in C++ supporting non-blocking I/O, request parsing (GET/POST/DELETE), configurable routing via config files, CGI execution, chunked transfer encoding, and robust error/status code management.",
+    longDescription: "Webserv is a  custom HTTP server implemented in C++ supporting non-blocking I/O, request parsing (GET/POST/DELETE), configurable routing via config files, CGI execution, chunked transfer encoding, and robust error/status code management. The goal is to understand how a real web server operates at the system level: socket lifecycle, multiplexed I/O, HTTP protocol parsing, CGI process management, and file descriptor discipline under concurrent load.",
     stack: "C++, Sockets, CGI, HTTP/1.1",
-    features: ["Sockets non-bloquantes", "Parsing de fichiers de configuration", "Gestion des cookies et sessions", "Téléchargement de fichiers"],
-    images: [
-
-    ],
+    features: ["GET, POST, DELETE requests", "Static file serving & directory autoindex", "CGI/1.1 (Python, PHP, Bash) with non-blocking pipe I/O", "Chunked Transfer-Encoding", "Multipart file upload with extension allowlist", "Multiple server blocks/multiple ports", "Custom error pages (/server and /location)", "Connection timeout"],
+    images: [],
   },
   {
     title: "Inception",
     category: "DEVOPS",
     description: "Infrastructure Docker systématisée.",
     longDescription: "Inception is a Docker-based infrastructure project deploying a multi-container architecture with isolated services including NGINX reverse proxy, WordPress, MariaDB database, custom Docker networks, environment variable management and containerization via Docker Compose.",
-    stack: "Docker, Nginx, MariaDB, WordPress, Redis",
-    features: ["Volumes persistants", "Réseaux Docker isolés", "Configuration TLS/SSL auto-signée", "Politiques de redémarrage"],
-    images: [
-
-    ],
+    stack: "Docker, Nginx, MariaDB, WordPress, Redis, FTP, Adminer",
+    features: ["Three containers communicate over a dedicated Docker bridge network", "nginx: sole entry point, port 443, TLS only, serves static files and proxies PHP requests to WordPress via FastCGI on port 9000.", "wordpress: WordPress + php-fpm, no web server, communicates with MariaDB on port 3306.", "mariadb: database only, not exposed outside the Docker network"],
+    images: [],
   },
 ];
 
+// Sous-composant pour gérer l'apparition fluide des images après chargement complet
+function GalleryImage({ src, alt }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`gallery-img ${isLoaded ? 'loaded' : ''}`}
+      onLoad={() => setIsLoaded(true)}
+    />
+  );
+}
+
 function ProjectCard({ project, onOpen }) {
+  // Préchargement des images en arrière-plan dès le survol du bouton
+  const handlePrefetch = () => {
+    if (project.images && project.images.length > 0) {
+      project.images.forEach((src) => {
+        const img = new Image();
+        img.src = src;
+      });
+    }
+  };
+
   return (
     <div className="project-card">
       <span className="project-type">{project.category}</span>
       <h2 className="project-name">{project.title}</h2>
       <p className="project-description">{project.description}</p>
       <p className="project-stack">{project.stack}</p>
-      <button className="open-btn" onClick={() => onOpen(project)}>
+      <button 
+        className="open-btn" 
+        onClick={() => onOpen(project)}
+        onMouseEnter={handlePrefetch}
+      >
         OPEN PROJECT
         <ArrowRight size={16} />
       </button>
@@ -124,20 +146,25 @@ function ProjectModal({ project, onClose }) {
         </div>
 
         <div className="modal-body">
-          {/* Galerie Photo Défilante */}
-          <div className="modal-gallery-container">
-            <button className="gallery-arrow left" onClick={() => handleScroll('left')}>
-              <ChevronLeft size={20} />
-            </button>
-            <div className="modal-gallery" ref={galleryRef}>
-              {project.images.map((img, idx) => (
-                <img key={idx} src={img} alt={`${project.title} aperçu ${idx + 1}`} />
-              ))}
+          {project.images && project.images.length > 0 && (
+            <div className="modal-gallery-container">
+              <button className="gallery-arrow left" onClick={() => handleScroll('left')}>
+                <ChevronLeft size={20} />
+              </button>
+              <div className="modal-gallery" ref={galleryRef}>
+                {project.images.map((img, idx) => (
+                  <GalleryImage 
+                    key={idx} 
+                    src={img} 
+                    alt={`${project.title} aperçu ${idx + 1}`} 
+                  />
+                ))}
+              </div>
+              <button className="gallery-arrow right" onClick={() => handleScroll('right')}>
+                <ChevronRight size={20} />
+              </button>
             </div>
-            <button className="gallery-arrow right" onClick={() => handleScroll('right')}>
-              <ChevronRight size={20} />
-            </button>
-          </div>
+          )}
 
           <div className="modal-content-details">
             <div className="modal-section-block">
@@ -165,6 +192,13 @@ export default function Projects() {
 
   return (
     <div className="projects">
+      <div className="top-bar">
+        <a href="/" className="back-home-btn">
+          <ArrowLeft size={18} />
+          BACK TO HOME
+        </a>
+      </div>
+
       <section className="project-hero">
         <h1 className="project-hero_title">PROJECTS</h1>
       </section>
@@ -201,6 +235,7 @@ export default function Projects() {
           onClose={() => setSelectedProject(null)}
         />
       )}
+
     </div>
   );
 }
