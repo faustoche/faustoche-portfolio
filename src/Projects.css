@@ -229,7 +229,7 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 12px;
+    margin-top: 20px;
 }
 
 .tech-tag {
@@ -283,7 +283,6 @@ body {
     justify-content: center;
     cursor: pointer;
     z-index: 5;
-    box-shadow: 2px 2px 0px #2b2b2b;
     transition: transform 0.1s ease;
 }
 

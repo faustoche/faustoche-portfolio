@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowRight, X, Code2, Layout, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, X, Code2, NotepadText, ChevronLeft, ChevronRight } from "lucide-react";
 import "./Projects.css";
 
 /// Prendre les images depuis le nom du dossier directement
@@ -8,11 +8,12 @@ const webProjects = [
   {
     title: "ft_transcendance",
     category: "WEB APP",
-    description: "Plateforme Pong multijoueur temps réel.",
-    longDescription: "adasdsad",
-    stack: "a, b, c, d, e",
-    features: ["a a", "a", "a", "a"],
+    description: "Multiplayer Pong game platform.",
+    longDescription: "Transcendance is a real-time multiplayer web application built around a Pong game with live gameplay, secure authentication system, matchmaking queue, in-game chat, user profiles with stats tracking, and persistent database integration for players, matches, and social interactions.",
+    stack: "Typescript, Tailwind CSS, Node.js, Fastify",
+    features: ["Multiplayer game", "Live chat", "Dashboard recap"],
     images: [
+      "./transcendance/transcendance_register.png",
       "./transcendance/transcendance_basic_profile.png",
       "./transcendance/transcendance_profile.png",
       "./transcendance/transcendance_homepage.png",
@@ -20,6 +21,7 @@ const webProjects = [
       "./transcendance/transcendance_friend_profil.png",
       "./transcendance/transcendance_game_invite.png",
       "./transcendance/transcendance_gameroom.png",
+      "./transcendance/transcendance_gameplay.png",
       "./transcendance/transcendance_dashboard_graph.png",
       "./transcendance/transcendance_dashboard_recap.png"
     ],
@@ -28,9 +30,9 @@ const webProjects = [
     title: "Camagru",
     category: "WEB APP",
     description: "Application de montage photo (Instagram-like).",
-    longDescription: "Un projet full-stack réalisé sans frameworks (PHP pur) pour assimiler les fondamentaux du web : gestion de base de données, upload de fichiers, filtres photo en JavaScript et sécurité applicative.",
-    stack: "PHP, JavaScript, MySQL, CSS",
-    features: ["Prise de photo via webcam", "Filtres superposables", "Système de likes et commentaires", "Validation par email"],
+    longDescription: "Camagru is a full-stack PHP web application inspired by Instagram implementing user authentication, email verification, webcam capture, filter with face recognition, social feed, likes/comments system, email notification system, and persistent storage of content.",
+    stack: "PHP, Javascript, SQLite",
+    features: ["Webcam shots", "Facial recognition and filter", "Likes and comments"],
     images: [
       "./camagru/camagru_register.png",
       "./camagru/camagru_mail_check.png",
@@ -51,9 +53,9 @@ const devopsProjects = [
   {
     title: "Webserv",
     category: "DEVOPS",
-    description: "Serveur HTTP écrit en C++98.",
-    longDescription: "Développement d'un serveur HTTP capable de gérer des requêtes GET/POST/DELETE, de supporter les scripts CGI et de multiplexer les connexions entrantes avec select ou poll.",
-    stack: "C++98, Sockets, CGI, HTTP/1.1",
+    description: "HTTP server.",
+    longDescription: "Webserv is a  custom HTTP server implemented in C++ supporting non-blocking I/O, request parsing (GET/POST/DELETE), configurable routing via config files, CGI execution, chunked transfer encoding, and robust error/status code management.",
+    stack: "C++, Sockets, CGI, HTTP/1.1",
     features: ["Sockets non-bloquantes", "Parsing de fichiers de configuration", "Gestion des cookies et sessions", "Téléchargement de fichiers"],
     images: [
 
@@ -63,7 +65,7 @@ const devopsProjects = [
     title: "Inception",
     category: "DEVOPS",
     description: "Infrastructure Docker systématisée.",
-    longDescription: "Mise en place d'une architecture multi-conteneurs sécurisée avec Docker Compose. Chaque infrastructure applicative tourne au sein d'un conteneur dédié basé sur Alpine Linux.",
+    longDescription: "Inception is a Docker-based infrastructure project deploying a multi-container architecture with isolated services including NGINX reverse proxy, WordPress, MariaDB database, custom Docker networks, environment variable management and containerization via Docker Compose.",
     stack: "Docker, Nginx, MariaDB, WordPress, Redis",
     features: ["Volumes persistants", "Réseaux Docker isolés", "Configuration TLS/SSL auto-signée", "Politiques de redémarrage"],
     images: [
@@ -139,12 +141,12 @@ function ProjectModal({ project, onClose }) {
 
           <div className="modal-content-details">
             <div className="modal-section-block">
-              <h3><Layout size={18} /> Explication du projet</h3>
+              <h3><NotepadText size={18} /> About the project</h3>
               <p>{project.longDescription}</p>
             </div>
             
             <div className="modal-section-block">
-              <h3><Code2 size={18} /> Fonctionnalités clés</h3>
+              <h3><Code2 size={18} /> Key functionalities</h3>
               <ul className="features-list">
                 {project.features.map((feat, idx) => (
                   <li key={idx}>{feat}</li>
