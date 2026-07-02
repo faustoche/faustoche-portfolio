@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export default class Player {
-	constructor(scene, modelPath, renderer) {
+	constructor(scene, modelPath, renderer, collidableObjects) {
 		this.scene = scene;
 		this.renderer = renderer;
+		this.collidableObjects = collidableObjects || [];
+		this.raycaster = new THREE.Raycaster();
 		
 		// Size and movement : to adjust
 		this.moveSpeed = 0.05;
@@ -20,7 +22,7 @@ export default class Player {
 		this.animations = [];
 		this.idleAction = null;
 		this.walkAction = null;
-		this.currentAction = null; // animation in progress
+		this.currentAction = null;
 
 		this.init(modelPath);
 		this.initEvents();
@@ -51,8 +53,6 @@ export default class Player {
 					child.castShadow = true;
 					child.receiveShadow = true;
 
-					// TO CHECK
-					// If object has an image texture, adding clearness
 					if (child.material && child.material.map) {
 						child.material.map.anisotropy = maxAnisotropy;
 					}
@@ -65,15 +65,12 @@ export default class Player {
 				this.mixer = new THREE.AnimationMixer(model);
 				this.animations = gltf.animations;
 				
-				// Getting animation by their name
 				const idleClip = THREE.AnimationClip.findByName(this.animations, 'faustine_idle');
 				const walkClip = THREE.AnimationClip.findByName(this.animations, 'faustine_walk');
 
-				// Creation associated action
 				if (idleClip) this.idleAction = this.mixer.clipAction(idleClip);
 				if (walkClip) this.walkAction = this.mixer.clipAction(walkClip);
 
-				// Idle by default
 				if (this.idleAction) {
 					this.idleAction.play();
 					this.currentAction = this.idleAction;
@@ -93,26 +90,55 @@ export default class Player {
 		});
 	}
 
-	// Transition between animation
 	fadeToAction(nextAction, duration = 0.2) {
-		// If animation is playing, nothing happen
 		if (this.currentAction === nextAction || !nextAction) return;
 
 		const previousAction = this.currentAction;
 		this.currentAction = nextAction;
 
-		// Fading old one
 		if (previousAction) {
 			previousAction.fadeOut(duration);
 		}
 
-		// New animation
 		this.currentAction
 			.reset()
 			.setEffectiveTimeScale(1)
 			.setEffectiveWeight(1)
 			.fadeIn(duration)
 			.play();
+	}
+
+	// --- NOUVELLE MÉTHODE : Détection de collision robuste ---
+	checkCollision(directionVector, distance) {
+		if (!this.collidableObjects || this.collidableObjects.length === 0) return false;
+
+		const origin = this.mesh.position.clone();
+		// On lève légèrement le rayon pour être au niveau du ventre du personnage
+		origin.y += 0.2; 
+
+		// Largeur des épaules (évite de passer entre deux buissons)
+		const shoulderWidth = 0.15;
+		
+		// Vecteur perpendiculaire pour décaler les rayons à gauche et à droite
+		const right = new THREE.Vector3(-directionVector.z, 0, directionVector.x).normalize().multiplyScalar(shoulderWidth);
+
+		// On lance 3 rayons : au centre, à gauche et à droite du joueur
+		const origins = [
+			origin,
+			origin.clone().add(right),
+			origin.clone().sub(right)
+		];
+
+		for (let i = 0; i < origins.length; i++) {
+			this.raycaster.set(origins[i], directionVector);
+			const intersects = this.raycaster.intersectObjects(this.collidableObjects, true);
+			
+			// Si un obstacle est détecté dans la distance de mouvement, on bloque
+			if (intersects.length > 0 && intersects[0].distance < distance) {
+				return true; 
+			}
+		}
+		return false;
 	}
 
 	update(deltaTime) {
@@ -126,32 +152,49 @@ export default class Player {
 		if (this.keys.d || this.keys.ArrowRight) { dx += 1; isMoving = true; }
 
 		if (isMoving) {
-			// Vector normalize
 			const length = Math.sqrt(dx * dx + dz * dz);
 			const normalizedDx = dx / length;
 			const normalizedDz = dz / length;
 
-			// angles on controls
 			const finalDx = normalizedDx * Math.cos(this.movementOffset) - normalizedDz * Math.sin(this.movementOffset);
 			const finalDz = normalizedDx * Math.sin(this.movementOffset) + normalizedDz * Math.cos(this.movementOffset);
 
-			// better movement
-			this.mesh.position.x += finalDx * this.moveSpeed;
-			this.mesh.position.z += finalDz * this.moveSpeed;
+			// Vitesse de déplacement prévue sur cette frame
+			const moveX = finalDx * this.moveSpeed;
+			const moveZ = finalDz * this.moveSpeed;
 
-			// rotation
+			// Rayon corporel du joueur (l'espace qu'il occupe)
+			const playerRadius = 0.2; 
+
+			// --- SYSTÈME DE GLISSEMENT (SÉPARATION DES AXES) ---
+			// On teste le mouvement X. Math.abs(moveX) est la distance qu'on s'apprête à parcourir.
+			if (Math.abs(moveX) > 0) {
+				const dirX = new THREE.Vector3(Math.sign(moveX), 0, 0);
+				// On anticipe la collision : rayon + distance parcourue
+				if (!this.checkCollision(dirX, playerRadius + Math.abs(moveX))) {
+					this.mesh.position.x += moveX;
+				}
+			}
+
+			// On teste le mouvement Z indépendamment.
+			if (Math.abs(moveZ) > 0) {
+				const dirZ = new THREE.Vector3(0, 0, Math.sign(moveZ));
+				if (!this.checkCollision(dirZ, playerRadius + Math.abs(moveZ))) {
+					this.mesh.position.z += moveZ;
+				}
+			}
+
+			// La rotation du modèle reste orientée vers la direction globale souhaitée
 			const angle = Math.atan2(finalDx, finalDz);
 			this.mesh.rotation.y = angle;
 		}
 
-		// Transitions
 		if (isMoving) {
 			this.fadeToAction(this.walkAction, 0.2);
 		} else {
 			this.fadeToAction(this.idleAction, 0.2);
 		}
 
-		// Updating graphic mixer : to check
 		if (this.mixer) {
 			this.mixer.update(deltaTime);
 		}

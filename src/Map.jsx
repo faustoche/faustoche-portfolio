@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js';
-
-// Importation du DRACOLoader pour le fichier world_small.glb
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 import Player from './Player/Player.js';
@@ -14,16 +12,12 @@ export default function Map() {
   const mountRef = useRef(false);
 
   useEffect(() => {
-    // Check to avoid loading the scene twice
     if (mountRef.current) return;
     mountRef.current = true;
 
-    // State variables for scene management
     let activeScene = 'world';
     let isNearShop = false;
     const recordShopPosition = new THREE.Vector3();
-
-    // variables for the NPC Alan 
     let alanMixer = null;
 
     const uiPrompt = document.getElementById('ui-prompt');
@@ -34,27 +28,16 @@ export default function Map() {
 
     const skyColor = '#87CEEB';
     scene.background = new THREE.Color(skyColor);
-    // Fog resserré : en plus de l'effet visuel, ça réduit la zone perçue,
-    // utile si tu ajoutes du LOD/culling distance plus tard.
     scene.fog = new THREE.Fog(skyColor, 10, 60);
 
     const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
     const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-
-    // FIX PERF #1 : cap du pixel ratio. Sans ça, sur un écran Retina/4K,
-    // le canvas peut être rendu en interne à 2x-3x la résolution affichée,
-    // ce qui multiplie le coût du fragment shader sur TOUTE la scène.
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping;
     renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = true;
-
-    // FIX PERF #2 : PCFSoftShadowMap est le mode d'ombre le plus cher
-    // (multi-échantillonnage par pixel). PCFShadowMap reste propre
-    // visuellement pour ce type de scène et coûte nettement moins cher.
     renderer.shadowMap.type = THREE.PCFShadowMap;
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 2);
@@ -63,14 +46,6 @@ export default function Map() {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
     directionalLight.position.set(-15, 25, 15);
     directionalLight.castShadow = true;
-
-    // FIX PERF #3 : le frustum de la shadow camera était de 80x80 unités
-    // (-40 à 40) avec une shadow map de 2048x2048. Plus le frustum est
-    // grand, moins chaque texel d'ombre est précis ET plus le calcul
-    // est cher pour la même résolution. On resserre sur la zone de jeu
-    // réelle (à ajuster selon la taille réelle de ton monde) et on
-    // réduit la résolution en conséquence : le ratio précision/coût
-    // est bien meilleur.
     directionalLight.shadow.camera.near = 0.5;
     directionalLight.shadow.camera.far = 60;
     directionalLight.shadow.camera.left = -20;
@@ -82,26 +57,24 @@ export default function Map() {
     directionalLight.shadow.normalBias = 0.02;
     scene.add(directionalLight);
 
-    const player = new Player(scene, '/models/faustine.glb', renderer);
+    // --- TABLEAU DES COLLISIONS ---
+    const collidableObjects = [];
+
+    const player = new Player(scene, '/models/faustine.glb', renderer, collidableObjects);
     const cameraOffset = new THREE.Vector3(0, 2.2, 4.4);
 
-    // 1. Loader standard pour les fichiers non compressés
     const loader = new GLTFLoader();
-
-    // 2. Loader spécifique équipé du décodeur Draco pour world_small.glb
     const worldLoader = new GLTFLoader();
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
     worldLoader.setDRACOLoader(dracoLoader);
 
-    // Loading trees (Fichier standard)
     loader.load('/models/trees.glb', (treesGltf) => {
       const treeVariations = [];
       treesGltf.scene.children.forEach((child) => {
         if (child.isGroup || child.isMesh) treeVariations.push(child);
       });
 
-      // Loading grass (Fichier standard)
       loader.load('/models/grass_patch.glb', (grassGltf) => {
         let grassPatchMesh = null;
         let singleGrassMesh = null;
@@ -118,7 +91,6 @@ export default function Map() {
           }
         });
 
-        // Loading the world (Utilisation du worldLoader avec Draco)
         worldLoader.load('/models/world_small.glb', (gltf) => {
           gltf.scene.scale.set(0.1, 0.1, 0.1);
           gltf.scene.updateMatrixWorld(true);
@@ -128,10 +100,14 @@ export default function Map() {
             if (child.isMesh) {
               child.castShadow = true;
               child.receiveShadow = true;
+
+              // On enregistre tout sauf le sol
+              if (child.name !== 'Land_grass') {
+                collidableObjects.push(child);
+              }
             }
           });
 
-          // shop's position
           const shopObject = gltf.scene.getObjectByName('Outside recordshop');
           if (shopObject) {
             shopObject.getWorldPosition(recordShopPosition);
@@ -151,13 +127,13 @@ export default function Map() {
             const placeholder = gltf.scene.getObjectByName(shop.name);
             if (placeholder) {
               placeholder.visible = false;
-              // Utilisation du loader standard pour les boutiques secondaires si non compressées
               loader.load(shop.file, (gltfModel) => {
                 const newModel = gltfModel.scene;
                 newModel.traverse((child) => {
                   if (child.isMesh) {
                     child.castShadow = true;
                     child.receiveShadow = true;
+                    collidableObjects.push(child);
                   }
                 });
                 newModel.position.copy(placeholder.position);
@@ -188,7 +164,6 @@ export default function Map() {
               const instancedPatch = new THREE.InstancedMesh(grassPatchMesh.geometry, grassPatchMesh.material, patchCount);
               const instancedSingle = new THREE.InstancedMesh(singleGrassMesh.geometry, singleGrassMesh.material, singleCount);
 
-              // FIX PERF #4 : l'herbe ne doit pas projeter d'ombre.
               instancedPatch.castShadow = false;
               instancedSingle.castShadow = false;
               instancedPatch.receiveShadow = true;
@@ -246,14 +221,15 @@ export default function Map() {
                   if (!part.isMesh) return;
                   const instancedMesh = new THREE.InstancedMesh(part.geometry, part.material, matrices.length);
 
-                  // FIX PERF #6 : les arbres projetaient des ombres en InstancedMesh
                   instancedMesh.castShadow = false;
                   instancedMesh.receiveShadow = true;
 
                   matrices.forEach((matrix, index) => instancedMesh.setMatrixAt(index, matrix));
                   instancedMesh.instanceMatrix.needsUpdate = true;
                   instancedMesh.computeBoundingSphere();
+                  
                   scene.add(instancedMesh);
+                  collidableObjects.push(instancedMesh); // On ajoute les arbres aux collisions
                 });
               });
             }
@@ -262,7 +238,6 @@ export default function Map() {
       });
     });
 
-    // --- Interaction and transition logic ---
     const handleKeyDown = (e) => {
       if (e.key.toLowerCase() === 'e' && isNearShop && activeScene === 'world') {
         transitionToShop();
@@ -287,6 +262,8 @@ export default function Map() {
     function loadShopScene() {
       activeScene = 'shop';
 
+      collidableObjects.length = 0;
+
       scene.children.forEach(child => {
         if (child.type !== 'AmbientLight' && child.type !== 'DirectionalLight' && child !== player.mesh) {
           child.visible = false;
@@ -296,10 +273,15 @@ export default function Map() {
       scene.background = new THREE.Color('#1a1a1a');
       scene.fog = null;
 
-      // Utilisation du loader standard (Fichiers non compressés)
       loader.load('/models/record_shop.glb', (gltf) => {
         const shopScene = gltf.scene;
         scene.add(shopScene);
+
+        shopScene.traverse((child) => {
+          if (child.isMesh) {
+            collidableObjects.push(child);
+          }
+        });
 
         if (player.mesh) {
           player.mesh.position.set(0, 0, 4);
@@ -332,7 +314,7 @@ export default function Map() {
               const action = alanMixer.clipAction(idleClip);
               action.play();
             } else {
-              console.warn("The 'alan_idle' animation cannot be found. Check the name in Blender.");
+              console.warn("The 'alan_idle' animation cannot be found.");
               alanMixer.clipAction(alanGltf.animations[0]).play();
             }
           }
@@ -387,35 +369,26 @@ export default function Map() {
 
     window.addEventListener('resize', handleResize);
 
-    // Starting the animation
     animate();
 
-    // Cleanup on page exit
     return () => {
       window.cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
-      dracoLoader.dispose(); // Nettoyage de la mémoire du décodeur Draco
+      dracoLoader.dispose();
       renderer.dispose();
     };
   }, []);
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-
-      {/* Button to leave the page and return to the menu */}
       <Link to="/" style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 30, color: 'white', background: 'rgba(0,0,0,0.5)', padding: '10px 20px', textDecoration: 'none', borderRadius: '5px', fontFamily: 'sans-serif' }}>
         Back to home page
       </Link>
-
-      {/* original overlays */}
       <div id="fade-overlay" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'black', opacity: 0, pointerEvents: 'none', transition: 'opacity 1s ease-in-out', zIndex: 20 }}></div>
-
       <div id="ui-prompt" style={{ display: 'none', position: 'absolute', top: '75%', left: '50%', transform: 'translate(-50%, -50%)', color: 'white', background: 'rgba(0,0,0,0.7)', padding: '15px 30px', borderRadius: '8px', fontFamily: 'sans-serif', pointerEvents: 'none', zIndex: 10 }}>
         Press 'E' to enter
       </div>
-
-      {/* canvas used by three.js */}
       <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }}></canvas>
     </div>
   );
