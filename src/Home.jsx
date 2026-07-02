@@ -21,7 +21,10 @@ export default function Home() {
 
 
       <section className="home-hero">
-        <h1 className="home-hero_title">Faustoche</h1>
+        <div className="home-hero-heading">
+          <h1 className="home-hero_title">FAUSTOCHE</h1>
+          <h2 className="home-hero_subtitle">FULL-STACK DEVELOPER</h2>
+        </div>
       </section>
 
       {/*  BOUTONS  */}

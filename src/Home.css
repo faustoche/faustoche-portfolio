@@ -71,11 +71,29 @@ html, body {
 	justify-content: center;
 	padding: 120px 0 30px;
 }
+
+.home-hero-heading {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .home-hero_title {
 	font-family: 'hello-chunky', cursive;
 	color: #f56c91;
 	font-size: 10.5rem;
 	margin: 0;
+}
+
+.home-hero_subtitle {
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-family: 'hello-chunky', cursive;
+  color: #fcbe39;
+  line-height: 0.9;
+  margin-top: 1rem;
+  text-align: center;
+  width: 100%;
+  transform: translateY(4rem);
 }
 
 /* BUTTONS */
