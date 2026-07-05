@@ -63,6 +63,20 @@ export default function Map() {
     const player = new Player(scene, '/models/faustine.glb', renderer, collidableObjects);
     const cameraOffset = new THREE.Vector3(0, 2.2, 4.4);
 
+    // --- Caméra de suivi façon Animal Crossing (dead zone + damping) ---
+    // Inchangée : cameraTarget est indépendant de player.mesh.position et ne
+    // suit que lorsque le joueur sort de la zone morte, avec un rattrapage
+    // amorti indépendant du framerate.
+    const cameraTarget = new THREE.Vector3(0, 0, 0);
+    const cameraDeadZoneRadius = 0.6;
+    const cameraFollowSpeed = 4;
+    let cameraTargetInitialized = false;
+
+    function snapCameraTarget(position) {
+      cameraTarget.copy(position);
+      cameraTargetInitialized = true;
+    }
+
     const loader = new GLTFLoader();
     const worldLoader = new GLTFLoader();
     const dracoLoader = new DRACOLoader();
@@ -101,7 +115,6 @@ export default function Map() {
               child.castShadow = true;
               child.receiveShadow = true;
 
-              // On enregistre tout sauf le sol
               if (child.name !== 'Land_grass') {
                 collidableObjects.push(child);
               }
@@ -147,6 +160,8 @@ export default function Map() {
                 } else {
                   scene.add(newModel);
                 }
+
+                player.updateCollisionBoxes();
               });
             }
           });
@@ -227,13 +242,15 @@ export default function Map() {
                   matrices.forEach((matrix, index) => instancedMesh.setMatrixAt(index, matrix));
                   instancedMesh.instanceMatrix.needsUpdate = true;
                   instancedMesh.computeBoundingSphere();
-                  
+
                   scene.add(instancedMesh);
-                  collidableObjects.push(instancedMesh); // On ajoute les arbres aux collisions
+                  collidableObjects.push(instancedMesh);
                 });
               });
             }
           }
+
+          player.updateCollisionBoxes();
         });
       });
     });
@@ -283,11 +300,15 @@ export default function Map() {
           }
         });
 
+        player.updateCollisionBoxes();
+
         if (player.mesh) {
           player.mesh.position.set(0, 0, 4);
           player.mesh.scale.set(4, 4, 4);
           player.movementOffset = -Math.PI / 2;
           player.mesh.visible = true;
+
+          snapCameraTarget(player.mesh.position);
         }
 
         loader.load('/models/alan.glb', (alanGltf) => {
@@ -328,6 +349,36 @@ export default function Map() {
     const clock = new THREE.Clock();
     let animationFrameId;
 
+    function updateWorldCamera(deltaTime) {
+      if (!player.mesh) return;
+
+      if (!cameraTargetInitialized) {
+        snapCameraTarget(player.mesh.position);
+      }
+
+      const offsetX = player.mesh.position.x - cameraTarget.x;
+      const offsetZ = player.mesh.position.z - cameraTarget.z;
+      const planarDistance = Math.sqrt(offsetX * offsetX + offsetZ * offsetZ);
+
+      if (planarDistance > cameraDeadZoneRadius) {
+        const excess = planarDistance - cameraDeadZoneRadius;
+        const dirX = offsetX / planarDistance;
+        const dirZ = offsetZ / planarDistance;
+
+        const desiredX = cameraTarget.x + dirX * excess;
+        const desiredZ = cameraTarget.z + dirZ * excess;
+
+        const followT = 1 - Math.exp(-cameraFollowSpeed * deltaTime);
+        cameraTarget.x += (desiredX - cameraTarget.x) * followT;
+        cameraTarget.z += (desiredZ - cameraTarget.z) * followT;
+      }
+
+      cameraTarget.y = player.mesh.position.y;
+
+      camera.position.copy(cameraTarget).add(cameraOffset);
+      camera.lookAt(cameraTarget);
+    }
+
     function animate() {
       const deltaTime = clock.getDelta();
 
@@ -345,10 +396,7 @@ export default function Map() {
           }
         }
 
-        if (player.mesh) {
-          camera.position.copy(player.mesh.position).add(cameraOffset);
-          camera.lookAt(player.mesh.position);
-        }
+        updateWorldCamera(deltaTime);
       }
       else if (activeScene === 'shop') {
         player.update(deltaTime);
