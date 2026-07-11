@@ -400,3 +400,23 @@ body {
 	.gallery-arrow.left { left: -10px; }
 	.gallery-arrow.right { right: -10px; }
 }
+
+@media (max-width: 480px) {
+	.project-hero_title {
+		font-size: 2.5rem;
+	}
+
+	.project-frame {
+		width: 92%;
+		padding: 20px;
+	}
+
+	.back-home-btn {
+		padding: 8px 14px;
+		font-size: 0.8rem;
+	}
+
+	.modal-title {
+		font-size: 1.8rem;
+	}
+}

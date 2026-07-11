@@ -4,36 +4,65 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-
+import './Map.css';
 import Player from './Player/Player.js';
 
+// Map Composant:
+// - Initialize Three.JS scene
+// - Load 3D models asynchronously
+// - Player controls (keyboard + joystick)
+// - Transition between scenes
+// - Animation loop
+
 export default function Map() {
+
+	// Where ThreeJS is drawing
 	const canvasRef = useRef(null);
+
+	// Single execution - avoid double-initialization
 	const mountRef = useRef(false);
 	
+	// React states for UI -> loading screen, joysticks, etc
 	const [isLoading, setIsLoading] = useState(true);
 	const [progress, setProgress] = useState(0);
+	const [isTouchDevice, setIsTouchDevice] = useState(false);
 
 	useEffect(() => {
-		if (mountRef.current) return;
+
+		// Détection du tactile ou non pour l'affichage du joystick
+		setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+		// Has the model been charged already?
+		if (mountRef.current)
+			return;
 		mountRef.current = true;
 
+		// Scene state 
 		let activeScene = 'world';
 		let isNearShop = false;
 		const recordShopPosition = new THREE.Vector3();
 		let alanMixer = null;
 
+		// DOM element
 		const uiPrompt = document.getElementById('ui-prompt');
 		const fadeOverlay = document.getElementById('fade-overlay');
+		const joystickZone = document.getElementById('virtual-joystick');
+		const joystickKnob = document.getElementById('joystick-knob');
 
 		const canvas = canvasRef.current;
+
+		// Scene initialization
 		const scene = new THREE.Scene();
 
+		// TO CHANGE: (see UNITY engine for sky)
 		const skyColor = '#87CEEB';
 		scene.background = new THREE.Color(skyColor);
 		scene.fog = new THREE.Fog(skyColor, 10, 60);
 
+		// Camera angle
 		const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+
+		// Draw the scene in canvas
 		const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
 		renderer.setSize(window.innerWidth, window.innerHeight);
 		renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -43,6 +72,7 @@ export default function Map() {
 		renderer.shadowMap.enabled = true;
 		renderer.shadowMap.type = THREE.PCFShadowMap;
 
+		// TO CHANGE: 
 		const ambientLight = new THREE.AmbientLight(0xffffff, 2);
 		scene.add(ambientLight);
 
@@ -60,24 +90,30 @@ export default function Map() {
 		directionalLight.shadow.normalBias = 0.02;
 		scene.add(directionalLight);
 
-
+		// Filled when models are loaded
+		// TO CHECK: la fontaine n'est pas dans les objets
 		const collidableObjects = [];
 
+		// Player and camera settings
 		const player = new Player(scene, '/models/faustine.glb', renderer, collidableObjects);
 		const cameraOffset = new THREE.Vector3(0, 2.2, 4.4);
 
 		const cameraTarget = new THREE.Vector3(0, 0, 0);
-		const cameraDeadZoneRadius = 0.6;
+		const cameraDeadZoneRadius = 0.6; // à réadapter selon la vitesse du joueur
 		const cameraFollowSpeed = 4;
 		let cameraTargetInitialized = false;
 
+		// Reset camera target for a smooth change
 		function snapCameraTarget(position) {
 			cameraTarget.copy(position);
 			cameraTargetInitialized = true;
 		}
 
+		// Loading manager to update ALL the loads
+		// 1 progression bar instead of one per file
 		const manager = new THREE.LoadingManager();
 		
+		// Artificial delay
 		manager.onLoad = () => {
 			setTimeout(() => {
 				setIsLoading(false);
@@ -89,11 +125,14 @@ export default function Map() {
 			setProgress(percentage);
 		};
 
+		// TO CHANGE: exporter tous les fichiers GLB avec Draco pour n'avoir qu'1 seul loader
 		const loader = new GLTFLoader(manager);
 		const worldLoader = new GLTFLoader(manager);
 		const dracoLoader = new DRACOLoader();
 		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
 		worldLoader.setDRACOLoader(dracoLoader);
+
+		// Chargement en cascade des objets
 
 		loader.load('/models/trees.glb', (treesGltf) => {
 			const treeVariations = [];
@@ -101,6 +140,7 @@ export default function Map() {
 				if (child.isGroup || child.isMesh) treeVariations.push(child);
 			});
 
+			// Différent type d'herbe
 			loader.load('/models/grass_patch.glb', (grassGltf) => {
 				let grassPatchMesh = null;
 				let singleGrassMesh = null;
@@ -117,6 +157,8 @@ export default function Map() {
 					}
 				});
 
+				// On réduit l'échelle de la map sinon elle est 10 fois trop frande
+				// Le sol n'est pas une collision
 				worldLoader.load('/models/world_small.glb', (gltf) => {
 					gltf.scene.scale.set(0.1, 0.1, 0.1);
 					gltf.scene.updateMatrixWorld(true);
@@ -133,6 +175,7 @@ export default function Map() {
 						}
 					});
 
+					// Récupération de la position du record shop pour placer l'entrée
 					const shopObject = gltf.scene.getObjectByName('Outside recordshop');
 					if (shopObject) {
 						shopObject.getWorldPosition(recordShopPosition);
@@ -140,44 +183,42 @@ export default function Map() {
 						recordShopPosition.set(3, 0, -5);
 					}
 
-					const streetLamp = gltf.scene.getObjectByName('Street_lamp');
-					if (streetLamp) {
-						const lampLight = new THREE.PointLight(0xffddaa, 2, 100);
-						lampLight.position.set(0, 25, 0);
-						streetLamp.add(lampLight);
-					}
+					// Remplacement des placeholders
+					// const shopsToReplace = [];
+					// shopsToReplace.forEach(shop => {
+					// 	const placeholder = gltf.scene.getObjectByName(shop.name);
+					// 	if (placeholder) {
+					// 		placeholder.visible = false;
+					// 		loader.load(shop.file, (gltfModel) => {
+					// 			const newModel = gltfModel.scene;
+					// 			newModel.traverse((child) => {
+					// 				if (child.isMesh) {
+					// 					child.castShadow = true;
+					// 					child.receiveShadow = true;
+					// 					collidableObjects.push(child);
+					// 				}
+					// 			});
+					// 			newModel.position.copy(placeholder.position);
+					// 			newModel.rotation.copy(placeholder.rotation);
+					// 			if (shop.rotYOffset !== 0) newModel.rotateY(shop.rotYOffset);
+					// 			const s = shop.scaleOffset;
+					// 			newModel.scale.set(placeholder.scale.x * s, placeholder.scale.y * s, placeholder.scale.z * s);
 
-					const shopsToReplace = [];
-					shopsToReplace.forEach(shop => {
-						const placeholder = gltf.scene.getObjectByName(shop.name);
-						if (placeholder) {
-							placeholder.visible = false;
-							loader.load(shop.file, (gltfModel) => {
-								const newModel = gltfModel.scene;
-								newModel.traverse((child) => {
-									if (child.isMesh) {
-										child.castShadow = true;
-										child.receiveShadow = true;
-										collidableObjects.push(child);
-									}
-								});
-								newModel.position.copy(placeholder.position);
-								newModel.rotation.copy(placeholder.rotation);
-								if (shop.rotYOffset !== 0) newModel.rotateY(shop.rotYOffset);
-								const s = shop.scaleOffset;
-								newModel.scale.set(placeholder.scale.x * s, placeholder.scale.y * s, placeholder.scale.z * s);
+					// 			if (placeholder.parent) {
+					// 				placeholder.parent.add(newModel);
+					// 			} else {
+					// 				scene.add(newModel);
+					// 			}
 
-								if (placeholder.parent) {
-									placeholder.parent.add(newModel);
-								} else {
-									scene.add(newModel);
-								}
+					// 			player.updateCollisionBoxes();
+					// 		});
+					// 	}
+					// });
 
-								player.updateCollisionBoxes();
-							});
-						}
-					});
 
+					// Instanciation de l'herbe et des arbres 
+					// Meilleure performance avec l'instanciation
+					// Points aléatoire mais répartis correctement 
 					const landGrass = gltf.scene.getObjectByName('Land_grass');
 					if (landGrass) {
 						landGrass.visible = false;
@@ -193,8 +234,8 @@ export default function Map() {
 
 							instancedPatch.castShadow = false;
 							instancedSingle.castShadow = false;
-							instancedPatch.receiveShadow = true;
-							instancedSingle.receiveShadow = true;
+							instancedPatch.receiveShadow = true; // à changer?
+							instancedSingle.receiveShadow = true; // à changer?
 
 							scene.add(instancedPatch);
 							scene.add(instancedSingle);
@@ -218,6 +259,10 @@ export default function Map() {
 							placeGrass(instancedSingle, singleCount);
 						}
 
+
+						// Placement des arbres
+						// À REFAIRE!!1! Les arbres doivent toucher le sol 🤡
+						// Variation rotation
 						const treePositions = [];
 						const dummyTree = new THREE.Object3D();
 						gltf.scene.traverse((object) => {
@@ -267,6 +312,7 @@ export default function Map() {
 			});
 		});
 
+		// Touche E pour ouvrir le record shop
 		const handleKeyDown = (e) => {
 			if (e.key.toLowerCase() === 'e' && isNearShop && activeScene === 'world') {
 				transitionToShop();
@@ -274,25 +320,83 @@ export default function Map() {
 		};
 		window.addEventListener('keydown', handleKeyDown);
 
+		// Sur mobile on clique 
+		const handleTouchPrompt = (e) => {
+			e.preventDefault();
+			if (isNearShop && activeScene === 'world') {
+				transitionToShop();
+			}
+		};
+
+		if (uiPrompt) {
+			uiPrompt.addEventListener('click', handleTouchPrompt);
+			uiPrompt.addEventListener('touchstart', handleTouchPrompt, { passive: false });
+		}
+
+		// Affichage du joystick
+		// Calcul de la distance entre point de contact et centre.
+		// Normalisation de la distance
+		const handleTouchMove = (e) => {
+			e.preventDefault();
+			if (!joystickZone || !joystickKnob || !player) return;
+			
+			const touch = e.targetTouches[0];
+			const rect = joystickZone.getBoundingClientRect();
+			const centerX = rect.left + rect.width / 2;
+			const centerY = rect.top + rect.height / 2;
+			
+			let dx = touch.clientX - centerX;
+			let dy = touch.clientY - centerY;
+			
+			// Le joystick ne déborde pas
+			const maxDist = rect.width / 2;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			
+			if (dist > maxDist) {
+				dx = (dx / dist) * maxDist;
+				dy = (dy / dist) * maxDist;
+			}
+			
+			joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+			player.setJoystick(dx / maxDist, dy / maxDist);
+		};
+
+		// Retour au centre quand on retire le doigt
+		const handleTouchEnd = (e) => {
+			e.preventDefault();
+			if (!joystickKnob || !player) return;
+			
+			joystickKnob.style.transform = `translate(0px, 0px)`;
+			player.setJoystick(0, 0);
+		};
+
+		if (joystickZone) {
+			joystickZone.addEventListener('touchmove', handleTouchMove, { passive: false });
+			joystickZone.addEventListener('touchstart', handleTouchMove, { passive: false });
+			joystickZone.addEventListener('touchend', handleTouchEnd, { passive: false });
+		}
+
+		// Transition pour les magasins avec un fondu au noir 
 		function transitionToShop() {
 			activeScene = 'transition';
 
-			if (uiPrompt) uiPrompt.style.display = 'none';
-			if (fadeOverlay) fadeOverlay.style.opacity = '1';
+			if (uiPrompt) 
+				uiPrompt.style.display = 'none';
+			if (fadeOverlay) 
+				fadeOverlay.style.opacity = '1';
 
 			setTimeout(() => {
 				loadShopScene();
-				setTimeout(() => {
-					if (fadeOverlay) fadeOverlay.style.opacity = '0';
-				}, 1000);
 			}, 1000);
 		}
 
+		// Chargement de l'intérieur du magasin
 		function loadShopScene() {
 			activeScene = 'shop';
+			collidableObjects.length = 0; // On vide les collisions
 
-			collidableObjects.length = 0;
 
+			// On les cache juste, pas besoin de les recharger 
 			scene.children.forEach(child => {
 				if (child.type !== 'AmbientLight' && child.type !== 'DirectionalLight' && child !== player.mesh) {
 					child.visible = false;
@@ -302,8 +406,81 @@ export default function Map() {
 			scene.background = new THREE.Color('#1a1a1a');
 			scene.fog = null;
 
-			loader.load('/models/record_shop.glb', (gltf) => {
-				const shopScene = gltf.scene;
+			// Barre de chargement
+			const shopLoaderOverlay = document.getElementById('shop-loader-overlay');
+			const shopProgressBar = document.getElementById('shop-progress-inner');
+			const shopProgressText = document.getElementById('shop-progress-text');
+			
+			if (shopLoaderOverlay) {
+				shopLoaderOverlay.style.display = 'flex';
+				shopLoaderOverlay.style.opacity = '1';
+			}
+			
+			let targetProgress = 0;
+			let currentDisplay = 0;
+			let modelsReady = false;
+			let shopLoaded = 0, shopTotal = 1;
+			let alanLoaded = 0, alanTotal = 1;
+
+			const calcProgress = () => {
+				const totalL = shopLoaded + alanLoaded;
+				const totalT = shopTotal + alanTotal;
+				if (totalT > 0) {
+					targetProgress = (totalL / totalT) * 90; 
+				}
+			};
+
+			const updateLoader = () => {
+				if (modelsReady) targetProgress = 100;
+				
+				currentDisplay += (targetProgress - currentDisplay) * 0.1;
+				const rounded = Math.round(currentDisplay);
+				
+				if (shopProgressBar) shopProgressBar.style.width = `${rounded}%`;
+				if (shopProgressText) shopProgressText.innerText = `${rounded}%`;
+
+				if (modelsReady && currentDisplay >= 99) {
+					if (shopProgressBar) shopProgressBar.style.width = '100%';
+					if (shopProgressText) shopProgressText.innerText = '100%';
+					
+					setTimeout(() => {
+						if (shopLoaderOverlay) shopLoaderOverlay.style.opacity = '0';
+						if (fadeOverlay) fadeOverlay.style.opacity = '0';
+						
+						setTimeout(() => {
+							if (shopLoaderOverlay) shopLoaderOverlay.style.display = 'none';
+						}, 1000); 
+					}, 200);
+				} else {
+					requestAnimationFrame(updateLoader);
+				}
+			};
+			
+			requestAnimationFrame(updateLoader);
+
+
+			// Chargement du modèle
+			Promise.all([
+				new Promise((resolve, reject) => {
+					loader.load('/models/record_shop.glb', resolve, (xhr) => {
+						if (xhr.lengthComputable) {
+							shopLoaded = xhr.loaded;
+							shopTotal = xhr.total;
+							calcProgress();
+						}
+					}, reject);
+				}),
+				new Promise((resolve, reject) => {
+					loader.load('/models/alan.glb', resolve, (xhr) => {
+						if (xhr.lengthComputable) {
+							alanLoaded = xhr.loaded;
+							alanTotal = xhr.total;
+							calcProgress();
+						}
+					}, reject);
+				})
+			]).then(([shopGltf, alanGltf]) => {
+				const shopScene = shopGltf.scene;
 				scene.add(shopScene);
 
 				shopScene.traverse((child) => {
@@ -314,47 +491,49 @@ export default function Map() {
 
 				player.updateCollisionBoxes();
 
+				// À CHANGER!!! 
 				if (player.mesh) {
 					player.mesh.position.set(0, 0, 4);
 					player.mesh.scale.set(4, 4, 4);
 					player.movementOffset = -Math.PI / 2;
 					player.mesh.visible = true;
-
 					snapCameraTarget(player.mesh.position);
 				}
 
-				loader.load('/models/alan.glb', (alanGltf) => {
-					const alanModel = alanGltf.scene;
-					alanModel.scale.set(0.9, 0.9, 0.9);
+				// À CHANGER!!	
+				const alanModel = alanGltf.scene;
+				alanModel.scale.set(0.9, 0.9, 0.9);
 
-					const chairObject = shopScene.getObjectByName('Chair');
-					if (chairObject) {
-						const chairPosition = new THREE.Vector3();
-						chairObject.getWorldPosition(chairPosition);
-						alanModel.position.set(chairPosition.x + 1.5, chairPosition.y, chairPosition.z);
+				const chairObject = shopScene.getObjectByName('Chair');
+				if (chairObject) {
+					const chairPosition = new THREE.Vector3();
+					chairObject.getWorldPosition(chairPosition);
+					alanModel.position.set(chairPosition.x + 1.5, chairPosition.y, chairPosition.z);
+				} else {
+					alanModel.position.set(2, 2, 0);
+					alanModel.rotation.y = Math.PI / 2;
+				}
+
+				scene.add(alanModel);
+
+				if (alanGltf.animations && alanGltf.animations.length > 0) {
+					alanMixer = new THREE.AnimationMixer(alanModel);
+					const idleClip = THREE.AnimationClip.findByName(alanGltf.animations, 'alan_idle');
+
+					if (idleClip) {
+						alanMixer.clipAction(idleClip).play();
 					} else {
-						alanModel.position.set(2, 2, 0);
-						alanModel.rotation.y = Math.PI / 2;
+						alanMixer.clipAction(alanGltf.animations[0]).play();
 					}
-
-					scene.add(alanModel);
-
-					if (alanGltf.animations && alanGltf.animations.length > 0) {
-						alanMixer = new THREE.AnimationMixer(alanModel);
-						const idleClip = THREE.AnimationClip.findByName(alanGltf.animations, 'alan_idle');
-
-						if (idleClip) {
-							const action = alanMixer.clipAction(idleClip);
-							action.play();
-						} else {
-							console.warn("The 'alan_idle' animation cannot be found.");
-							alanMixer.clipAction(alanGltf.animations[0]).play();
-						}
-					}
-				});
+				}
 
 				camera.position.set(15, 6.5, 0);
 				camera.lookAt(0, 2.8, 0);
+
+				modelsReady = true;
+			}).catch(err => {
+				console.error("Erreur lors du chargement de la scène shop :", err);
+				modelsReady = true; 
 			});
 		}
 
@@ -435,97 +614,92 @@ export default function Map() {
 			window.cancelAnimationFrame(animationFrameId);
 			window.removeEventListener('resize', handleResize);
 			window.removeEventListener('keydown', handleKeyDown);
+			
+			if (uiPrompt) {
+				uiPrompt.removeEventListener('click', handleTouchPrompt);
+				uiPrompt.removeEventListener('touchstart', handleTouchPrompt);
+			}
+
+			if (joystickZone) {
+				joystickZone.removeEventListener('touchmove', handleTouchMove);
+				joystickZone.removeEventListener('touchstart', handleTouchMove);
+				joystickZone.removeEventListener('touchend', handleTouchEnd);
+			}
+
 			dracoLoader.dispose();
 			renderer.dispose();
 		};
 	}, []);
 
 	return (
-		<div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-			
-			{/* LOADING SCREEN */}
-			<div 
-				style={{
-					position: 'absolute',
-					top: 0,
-					left: 0,
-					width: '100%',
-					height: '100%',
-					backgroundColor: '#F6F3E6', 
-					color: '#F56C91',
-					display: 'flex',
-					flexDirection: 'column',
-					justifyContent: 'center',
-					alignItems: 'center',
-					zIndex: 100,
-					opacity: isLoading ? 1 : 0,
-					pointerEvents: isLoading ? 'all' : 'none',
-					transition: 'opacity 1.2s ease-in-out',
-					fontFamily: "'VotrePolice', sans-serif",
-					padding: '20px'
-				}}
-			>
-				<div style={{ maxWidth: '400px', textAlign: 'center' }}>
-					<h1 style={{ 
-						fontSize: '3.8rem', 
-						fontWeight: '900', 
-						marginBottom: '10px',
-						textTransform: 'uppercase',
-						letterSpacing: '2px'
-					}}>
-						Map in progress
-					</h1>
-					
-					<p style={{ 
-						fontSize: '2rem',
-						color: '#FF8C00', 
-						lineHeight: '1.5', 
-						marginBottom: '40px' 
-					}}>
-						This project is still in progress.<br/>
-						Come back later to see its full potential.
-					</p>
+        <div className="map-container">
+            
+            {/* ECRAN DE CHARGEMENT PRINCIPAL */}
+            <div 
+                className="loading-screen"
+                style={{
+                    opacity: isLoading ? 1 : 0,
+                    pointerEvents: isLoading ? 'all' : 'none'
+                }}
+            >
+                <div className="loading-content">
+                    <h1 className="loading-title">
+                        Map in progress
+                    </h1>
+                    
+                    <p className="loading-subtitle">
+                        This project is still in progress.<br/>
+                        Come back later to see its full potential.
+                    </p>
 
-					<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div className="progress-container">
+                        <div className="progress-track">
+                            <div 
+                                className="progress-bar"
+                                style={{ width: `${progress}%` }} 
+                            />
+                        </div>
+                        
+                        <div className="progress-text">
+                            {Math.round(progress)}%
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-						{/* BARRE DE PROGRESSION */}
-						<div style={{ 
-							width: '300px', 
-							height: '2px',
-							backgroundColor: '#F56C91', 
-							overflow: 'hidden' 
-						}}>
-							<div 
-								style={{ 
-									width: `${progress}%`, 
-									height: '100%', 
-									backgroundColor: '#F56C91', 
-									transition: 'width 0.2s linear' 
-								}} 
-							/>
-						</div>
-						
-						<div style={{ 
-							marginTop: '15px', 
-							fontSize: '1rem', 
-							color: '#FF8C00', 
-							fontVariantNumeric: 'tabular-nums',
-							letterSpacing: '1px'
-						}}>
-							{Math.round(progress)}%
-						</div>
-					</div>
-				</div>
-			</div>
+            {/* BOUTON RETOUR A L'ACCUEIL */}
+            <Link to="/" className="back-home-link">
+                Back to home page
+            </Link>
 
-			<Link to="/" style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 30, color: 'white', background: 'rgba(0,0,0,0.5)', padding: '10px 20px', textDecoration: 'none', borderRadius: '5px', fontFamily: 'sans-serif' }}>
-				Back to home page
-			</Link>
-			<div id="fade-overlay" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'black', opacity: 0, pointerEvents: 'none', transition: 'opacity 1s ease-in-out', zIndex: 20 }}></div>
-			<div id="ui-prompt" style={{ display: 'none', position: 'absolute', top: '75%', left: '50%', transform: 'translate(-50%, -50%)', color: 'white', background: 'rgba(0,0,0,0.7)', padding: '15px 30px', borderRadius: '8px', fontFamily: 'sans-serif', pointerEvents: 'none', zIndex: 10 }}>
-				Press 'E' to enter
-			</div>
-			<canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }}></canvas>
-		</div>
-	);
+            {/* JOYSTICK VIRTUEL */}
+            <div 
+                id="virtual-joystick" 
+                className="virtual-joystick"
+                style={{ display: isTouchDevice ? 'block' : 'none' }}
+            >
+                <div id="joystick-knob" className="joystick-knob" />
+            </div>
+
+            {/* OVERLAY DE FONDU NOIR */}
+            <div id="fade-overlay" className="fade-overlay"></div>
+            
+            {/* ECRAN DE CHARGEMENT DU SHOP */}
+            <div id="shop-loader-overlay" className="shop-loader-overlay">
+                <div className="shop-progress-track">
+                    <div id="shop-progress-inner" className="shop-progress-inner" />
+                </div>
+                <div id="shop-progress-text" className="shop-progress-text">
+                    0%
+                </div>
+            </div>
+
+            {/* INVITE D'ACTION */}
+            <div id="ui-prompt" className="ui-prompt">
+                {isTouchDevice ? "Tap here to enter" : "Press 'E' to enter"}
+            </div>
+            
+            <canvas ref={canvasRef} className="map-canvas"></canvas>
+        </div>
+    );
 }

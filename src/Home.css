@@ -129,7 +129,7 @@ html, body {
 	opacity: 0.85;
 }
 .home-button--primary {
-	background-color: #f4ca43;
+	background-color: #fcbe39;
 	color: #1a1919;
 }
 .home-button--secondary {
@@ -145,4 +145,35 @@ html, body {
 	font-size: 0.8rem;
 	color: #6b6b6b;
 	border-top: 1px solid #e0dccf;
+}
+
+/* RESPONSIVE - HOME */
+
+@media (max-width: 768px) {
+	.home-header {
+		padding: 16px 24px;
+	}
+
+	.home-header_links {
+		gap: 16px;
+	}
+
+	.home-hero {
+		padding: 60px 0 30px;
+	}
+
+	.home-hero_title {
+		font-size: clamp(4rem, 15vw, 10.5rem);
+	}
+
+	.home-hero_subtitle {
+		transform: translateY(1.5rem);
+		font-size: clamp(1.8rem, 6vw, 4.5rem);
+	}
+
+	.home-button {
+		width: 85%;
+		max-width: 340px;
+		padding: 14px 20px;
+	}
 }

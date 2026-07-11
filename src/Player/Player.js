@@ -18,6 +18,9 @@ export default class Player {
 			ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false
 		};
 
+		// Ajout du support joystick
+		this.joystick = { x: 0, y: 0 };
+
 		this.mixer = null;
 		this.animations = [];
 		this.idleAction = null;
@@ -95,6 +98,12 @@ export default class Player {
 		window.addEventListener('keyup', (e) => {
 			if (this.keys.hasOwnProperty(e.key)) this.keys[e.key] = false;
 		});
+	}
+
+	// Nouvelle méthode pour mettre à jour le joystick
+	setJoystick(x, y) {
+		this.joystick.x = x;
+		this.joystick.y = y;
 	}
 
 	fadeToAction(nextAction, duration = 0.2) {
@@ -207,18 +216,24 @@ export default class Player {
 
 	update(deltaTime) {
 		let isMoving = false;
-		let dx = 0;
-		let dz = 0;
+		
+		// Intégration du joystick avec le clavier
+		let dx = this.joystick.x;
+		let dz = this.joystick.y;
 
-		if (this.keys.w || this.keys.ArrowUp)    { dz -= 1; isMoving = true; }
-		if (this.keys.s || this.keys.ArrowDown)  { dz += 1; isMoving = true; }
-		if (this.keys.a || this.keys.ArrowLeft)  { dx -= 1; isMoving = true; }
-		if (this.keys.d || this.keys.ArrowRight) { dx += 1; isMoving = true; }
+		if (this.keys.w || this.keys.ArrowUp)    { dz -= 1; }
+		if (this.keys.s || this.keys.ArrowDown)  { dz += 1; }
+		if (this.keys.a || this.keys.ArrowLeft)  { dx -= 1; }
+		if (this.keys.d || this.keys.ArrowRight) { dx += 1; }
 
-		if (isMoving) {
+		if (dx !== 0 || dz !== 0) {
+			isMoving = true;
 			const length = Math.sqrt(dx * dx + dz * dz);
-			const normalizedDx = dx / length;
-			const normalizedDz = dz / length;
+			// Utilisation de Math.max pour préserver la progressivité du joystick analogique
+			const factor = Math.max(length, 1);
+			const normalizedDx = dx / factor;
+			const normalizedDz = dz / factor;
+			
 			const finalDx = normalizedDx * Math.cos(this.movementOffset) - normalizedDz * Math.sin(this.movementOffset);
 			const finalDz = normalizedDx * Math.sin(this.movementOffset) + normalizedDz * Math.cos(this.movementOffset);
 			const frameScale = deltaTime * 60;
