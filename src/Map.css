@@ -179,6 +179,29 @@
 	z-index: 10;
 }
 
+/* EXIT SHOP BUTTON */
+
+.exit-shop-btn {
+	display: none;
+	position: absolute;
+	top: 20px;
+	right: 20px;
+	z-index: 30;
+	background: #FF8C00;
+	color: white;
+	padding: 10px 20px;
+	border: 2px solid #2b2b2b;
+	border-radius: 8px;
+	font-weight: 800;
+	cursor: pointer;
+	font-family: sans-serif;
+	transition: transform 0.1s ease;
+}
+
+.exit-shop-btn:active {
+	transform: scale(0.95);
+}
+
 /* CANVAS */
 .map-canvas {
 	display: block;

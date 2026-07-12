@@ -41,13 +41,18 @@ export default function Map() {
 		let activeScene = 'world';
 		let isNearShop = false;
 		const recordShopPosition = new THREE.Vector3();
+		
+		// VARIABLES GLOBALES POUR LA GESTION DE LA MEMOIRE (Pour vider la scène à la sortie)
 		let alanMixer = null;
+		let currentShopScene = null;
+		let currentAlanModel = null;
 
 		// DOM element
 		const uiPrompt = document.getElementById('ui-prompt');
 		const fadeOverlay = document.getElementById('fade-overlay');
 		const joystickZone = document.getElementById('virtual-joystick');
 		const joystickKnob = document.getElementById('joystick-knob');
+		const exitShopBtn = document.getElementById('exit-shop-btn');
 
 		const canvas = canvasRef.current;
 
@@ -90,12 +95,14 @@ export default function Map() {
 		directionalLight.shadow.normalBias = 0.02;
 		scene.add(directionalLight);
 
+		// SEPARATION DES COLLISIONS MONDE/SHOP
 		// Filled when models are loaded
 		// TO CHECK: la fontaine n'est pas dans les objets
-		const collidableObjects = [];
+		const worldColliders = [];
+		const shopColliders = [];
 
 		// Player and camera settings
-		const player = new Player(scene, '/models/faustine.glb', renderer, collidableObjects);
+		const player = new Player(scene, '/models/faustine.glb', renderer, worldColliders);
 		const cameraOffset = new THREE.Vector3(0, 2.2, 4.4);
 
 		const cameraTarget = new THREE.Vector3(0, 0, 0);
@@ -170,7 +177,7 @@ export default function Map() {
 							child.receiveShadow = true;
 
 							if (child.name !== 'Land_grass') {
-								collidableObjects.push(child);
+								worldColliders.push(child);
 							}
 						}
 					});
@@ -182,39 +189,6 @@ export default function Map() {
 					} else {
 						recordShopPosition.set(3, 0, -5);
 					}
-
-					// Remplacement des placeholders
-					// const shopsToReplace = [];
-					// shopsToReplace.forEach(shop => {
-					// 	const placeholder = gltf.scene.getObjectByName(shop.name);
-					// 	if (placeholder) {
-					// 		placeholder.visible = false;
-					// 		loader.load(shop.file, (gltfModel) => {
-					// 			const newModel = gltfModel.scene;
-					// 			newModel.traverse((child) => {
-					// 				if (child.isMesh) {
-					// 					child.castShadow = true;
-					// 					child.receiveShadow = true;
-					// 					collidableObjects.push(child);
-					// 				}
-					// 			});
-					// 			newModel.position.copy(placeholder.position);
-					// 			newModel.rotation.copy(placeholder.rotation);
-					// 			if (shop.rotYOffset !== 0) newModel.rotateY(shop.rotYOffset);
-					// 			const s = shop.scaleOffset;
-					// 			newModel.scale.set(placeholder.scale.x * s, placeholder.scale.y * s, placeholder.scale.z * s);
-
-					// 			if (placeholder.parent) {
-					// 				placeholder.parent.add(newModel);
-					// 			} else {
-					// 				scene.add(newModel);
-					// 			}
-
-					// 			player.updateCollisionBoxes();
-					// 		});
-					// 	}
-					// });
-
 
 					// Instanciation de l'herbe et des arbres 
 					// Meilleure performance avec l'instanciation
@@ -259,7 +233,6 @@ export default function Map() {
 							placeGrass(instancedSingle, singleCount);
 						}
 
-
 						// Placement des arbres
 						// À REFAIRE!!1! Les arbres doivent toucher le sol 🤡
 						// Variation rotation
@@ -301,13 +274,13 @@ export default function Map() {
 									instancedMesh.computeBoundingSphere();
 
 									scene.add(instancedMesh);
-									collidableObjects.push(instancedMesh);
+									worldColliders.push(instancedMesh);
 								});
 							});
 						}
 					}
 
-					player.updateCollisionBoxes();
+					player.setCollidableObjects(worldColliders);
 				});
 			});
 		});
@@ -328,9 +301,21 @@ export default function Map() {
 			}
 		};
 
+		const handleExit = (e) => {
+			e.preventDefault();
+			if (activeScene === 'shop') {
+				transitionToWorld();
+			}
+		};
+
 		if (uiPrompt) {
 			uiPrompt.addEventListener('click', handleTouchPrompt);
 			uiPrompt.addEventListener('touchstart', handleTouchPrompt, { passive: false });
+		}
+
+		if (exitShopBtn) {
+			exitShopBtn.addEventListener('click', handleExit);
+			exitShopBtn.addEventListener('touchstart', handleExit, { passive: false })
 		}
 
 		// Affichage du joystick
@@ -393,12 +378,12 @@ export default function Map() {
 		// Chargement de l'intérieur du magasin
 		function loadShopScene() {
 			activeScene = 'shop';
-			collidableObjects.length = 0; // On vide les collisions
-
+			shopColliders.length = 0;
 
 			// On les cache juste, pas besoin de les recharger 
 			scene.children.forEach(child => {
 				if (child.type !== 'AmbientLight' && child.type !== 'DirectionalLight' && child !== player.mesh) {
+					child.userData.isWorldObject = true;
 					child.visible = false;
 				}
 			});
@@ -446,6 +431,7 @@ export default function Map() {
 					setTimeout(() => {
 						if (shopLoaderOverlay) shopLoaderOverlay.style.opacity = '0';
 						if (fadeOverlay) fadeOverlay.style.opacity = '0';
+						if (exitShopBtn) exitShopBtn.style.display = 'block';
 						
 						setTimeout(() => {
 							if (shopLoaderOverlay) shopLoaderOverlay.style.display = 'none';
@@ -457,7 +443,6 @@ export default function Map() {
 			};
 			
 			requestAnimationFrame(updateLoader);
-
 
 			// Chargement du modèle
 			Promise.all([
@@ -480,44 +465,56 @@ export default function Map() {
 					}, reject);
 				})
 			]).then(([shopGltf, alanGltf]) => {
-				const shopScene = shopGltf.scene;
-				scene.add(shopScene);
+				currentShopScene = shopGltf.scene;
+				scene.add(currentShopScene);
+				
+				// CORRECTION: Actualisation de la matrice avant l'extraction des collisions
+				currentShopScene.updateMatrixWorld(true);
 
-				shopScene.traverse((child) => {
+				currentShopScene.traverse((child) => {
 					if (child.isMesh) {
-						collidableObjects.push(child);
+						shopColliders.push(child);
 					}
 				});
 
-				player.updateCollisionBoxes();
+				player.setCollidableObjects(shopColliders);
 
 				// À CHANGER!!! 
 				if (player.mesh) {
-					player.mesh.position.set(0, 0, 4);
-					player.mesh.scale.set(4, 4, 4);
+					// Position abaissée sur Y et échelle augmentée pour le personnage
+					player.mesh.position.set(0, -0.9, 4); 
+					player.mesh.scale.set(6.5, 6.5, 6.5);
 					player.movementOffset = -Math.PI / 2;
 					player.mesh.visible = true;
+					
+					// CORRECTION: Agrandissement de la capsule physique proportionnellement à l'échelle visuelle
+					player.playerRadius = 0.10 * 6.5;
+					player.playerHeight = 0.5 * 6.5;
+					player.playerCollider.radius = player.playerRadius;
+
 					snapCameraTarget(player.mesh.position);
 				}
 
 				// À CHANGER!!	
-				const alanModel = alanGltf.scene;
-				alanModel.scale.set(0.9, 0.9, 0.9);
+				currentAlanModel = alanGltf.scene;
+				currentAlanModel.scale.set(1.5, 1.5, 1.5);
 
-				const chairObject = shopScene.getObjectByName('Chair');
+				const chairObject = currentShopScene.getObjectByName('Chair');
 				if (chairObject) {
 					const chairPosition = new THREE.Vector3();
 					chairObject.getWorldPosition(chairPosition);
-					alanModel.position.set(chairPosition.x + 1.5, chairPosition.y, chairPosition.z);
+					// Décalage corrigé pour qu'Alan sorte du meuble
+					currentAlanModel.position.set(chairPosition.x - 0.8, chairPosition.y, chairPosition.z + 0.8);
 				} else {
-					alanModel.position.set(2, 2, 0);
-					alanModel.rotation.y = Math.PI / 2;
+					// Position au sol sécurisée si la chaise n'est pas trouvée
+					currentAlanModel.position.set(2, 0.1, 0);
+					currentAlanModel.rotation.y = Math.PI / 2;
 				}
 
-				scene.add(alanModel);
+				scene.add(currentAlanModel);
 
 				if (alanGltf.animations && alanGltf.animations.length > 0) {
-					alanMixer = new THREE.AnimationMixer(alanModel);
+					alanMixer = new THREE.AnimationMixer(currentAlanModel);
 					const idleClip = THREE.AnimationClip.findByName(alanGltf.animations, 'alan_idle');
 
 					if (idleClip) {
@@ -535,6 +532,61 @@ export default function Map() {
 				console.error("Erreur lors du chargement de la scène shop :", err);
 				modelsReady = true; 
 			});
+		}
+
+		function transitionToWorld() {
+			activeScene = 'transition';
+
+			if (exitShopBtn)
+				exitShopBtn.style.display = 'none';
+			if (fadeOverlay)
+				fadeOverlay.style.opacity = '1';
+
+			setTimeout(() => {
+				loadWorldScene();
+				setTimeout(() => {
+					if (fadeOverlay)
+						fadeOverlay.style.opacity = '0';
+				}, 500);
+			}, 1000);
+		}
+
+		function loadWorldScene() {
+			activeScene = 'world';
+
+			if (currentShopScene) {
+				scene.remove(currentShopScene);
+				currentShopScene = null;
+			}
+			if (currentAlanModel) {
+				scene.remove(currentAlanModel);
+				currentAlanModel = null;
+			}
+			alanMixer = null;
+
+			scene.background = new THREE.Color(skyColor);
+			scene.fog = new THREE.Fog(skyColor, 10, 60);
+
+			scene.children.forEach(child => {
+				if (child.userData.isWorldObject)
+					child.visible = true;
+			});
+
+			player.setCollidableObjects(worldColliders);
+
+			if (player.mesh) {
+				player.mesh.position.copy(recordShopPosition);
+				player.mesh.position.z += 2;
+				player.mesh.scale.set(1, 1, 1);
+				player.movementOffset = 0;
+				
+				// CORRECTION: Réinitialisation de la capsule de collision à sa taille par défaut
+				player.playerRadius = 0.10;
+				player.playerHeight = 0.5;
+				player.playerCollider.radius = player.playerRadius;
+				
+				snapCameraTarget(player.mesh.position);
+			}
 		}
 
 		const clock = new THREE.Clock();
@@ -625,6 +677,11 @@ export default function Map() {
 				joystickZone.removeEventListener('touchstart', handleTouchMove);
 				joystickZone.removeEventListener('touchend', handleTouchEnd);
 			}
+			
+			if (exitShopBtn) {
+				exitShopBtn.removeEventListener('click', handleExit);
+				exitShopBtn.removeEventListener('touchstart', handleExit);
+			}
 
 			dracoLoader.dispose();
 			renderer.dispose();
@@ -632,74 +689,79 @@ export default function Map() {
 	}, []);
 
 	return (
-        <div className="map-container">
-            
-            {/* ECRAN DE CHARGEMENT PRINCIPAL */}
-            <div 
-                className="loading-screen"
-                style={{
-                    opacity: isLoading ? 1 : 0,
-                    pointerEvents: isLoading ? 'all' : 'none'
-                }}
-            >
-                <div className="loading-content">
-                    <h1 className="loading-title">
-                        Map in progress
-                    </h1>
-                    
-                    <p className="loading-subtitle">
-                        This project is still in progress.<br/>
-                        Come back later to see its full potential.
-                    </p>
+		<div className="map-container">
+			
+			{/* ECRAN DE CHARGEMENT PRINCIPAL */}
+			<div 
+				className="loading-screen"
+				style={{
+					opacity: isLoading ? 1 : 0,
+					pointerEvents: isLoading ? 'all' : 'none'
+				}}
+			>
+				<div className="loading-content">
+					<h1 className="loading-title">
+						Map in progress
+					</h1>
+					
+					<p className="loading-subtitle">
+						This project is still in progress.<br/>
+						Come back later to see its full potential.
+					</p>
 
-                    <div className="progress-container">
-                        <div className="progress-track">
-                            <div 
-                                className="progress-bar"
-                                style={{ width: `${progress}%` }} 
-                            />
-                        </div>
-                        
-                        <div className="progress-text">
-                            {Math.round(progress)}%
-                        </div>
-                    </div>
-                </div>
-            </div>
+					<div className="progress-container">
+						<div className="progress-track">
+							<div 
+								className="progress-bar"
+								style={{ width: `${progress}%` }} 
+							/>
+						</div>
+						
+						<div className="progress-text">
+							{Math.round(progress)}%
+						</div>
+					</div>
+				</div>
+			</div>
 
-            {/* BOUTON RETOUR A L'ACCUEIL */}
-            <Link to="/" className="back-home-link">
-                Back to home page
-            </Link>
+			{/* BOUTON RETOUR A L'ACCUEIL */}
+			<Link to="/" className="back-home-link">
+				Back to home page
+			</Link>
 
-            {/* JOYSTICK VIRTUEL */}
-            <div 
-                id="virtual-joystick" 
-                className="virtual-joystick"
-                style={{ display: isTouchDevice ? 'block' : 'none' }}
-            >
-                <div id="joystick-knob" className="joystick-knob" />
-            </div>
+			{ /* LEAVE THE SHOP */}
+			<button id="exit-shop-btn" className="exit-shop-btn">
+				Exit Shop
+			</button>
 
-            {/* OVERLAY DE FONDU NOIR */}
-            <div id="fade-overlay" className="fade-overlay"></div>
-            
-            {/* ECRAN DE CHARGEMENT DU SHOP */}
-            <div id="shop-loader-overlay" className="shop-loader-overlay">
-                <div className="shop-progress-track">
-                    <div id="shop-progress-inner" className="shop-progress-inner" />
-                </div>
-                <div id="shop-progress-text" className="shop-progress-text">
-                    0%
-                </div>
-            </div>
+			{/* JOYSTICK */}
+			<div 
+				id="virtual-joystick" 
+				className="virtual-joystick"
+				style={{ display: isTouchDevice ? 'block' : 'none' }}
+			>
+				<div id="joystick-knob" className="joystick-knob" />
+			</div>
 
-            {/* INVITE D'ACTION */}
-            <div id="ui-prompt" className="ui-prompt">
-                {isTouchDevice ? "Tap here to enter" : "Press 'E' to enter"}
-            </div>
-            
-            <canvas ref={canvasRef} className="map-canvas"></canvas>
-        </div>
-    );
+			{/* OVERLAY DE FONDU NOIR */}
+			<div id="fade-overlay" className="fade-overlay"></div>
+			
+			{/* ECRAN DE CHARGEMENT DU SHOP */}
+			<div id="shop-loader-overlay" className="shop-loader-overlay">
+				<div className="shop-progress-track">
+					<div id="shop-progress-inner" className="shop-progress-inner" />
+				</div>
+				<div id="shop-progress-text" className="shop-progress-text">
+					0%
+				</div>
+			</div>
+
+			{/* */}
+			<div id="ui-prompt" className="ui-prompt">
+				{isTouchDevice ? "Tap here to enter" : "Press 'E' to enter"}
+			</div>
+			
+			<canvas ref={canvasRef} className="map-canvas"></canvas>
+		</div>
+	);
 }
