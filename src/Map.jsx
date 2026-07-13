@@ -447,7 +447,7 @@ export default function Map() {
 			// Chargement du modèle
 			Promise.all([
 				new Promise((resolve, reject) => {
-					loader.load('/models/record_shop.glb', resolve, (xhr) => {
+					worldLoader.load('/models/record_shop.glb', resolve, (xhr) => {
 						if (xhr.lengthComputable) {
 							shopLoaded = xhr.loaded;
 							shopTotal = xhr.total;
